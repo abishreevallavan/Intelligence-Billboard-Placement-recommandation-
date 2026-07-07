@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Results — Billboard Recommendation</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="15" cy="15" r="13" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="1" x2="15" y2="7" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="23" x2="15" y2="29" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="1" y1="15" x2="7" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="23" y1="15" x2="29" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <circle cx="15" cy="15" r="3" fill="#C2740B"/>
+      </svg>
+    </span>
+    <span>Billboard Recommendation<small>OOH Site Survey</small></span>
+  </div>
+  <div class="tagline">video-based surface analysis</div>
+</div>
+
+<div class="shell">
+
+  <div class="results-head">
+    <div>
+      <h1>{{ sites|length }} site{{ 's' if sites|length != 1 else '' }} recommended</h1>
+      <div class="meta">
+        <span class="mode-chip">Driver POV · Video</span>
+        &nbsp;·&nbsp; {{ frame_w }}×{{ frame_h }} px &nbsp;·&nbsp;
+        {{ total_frames }} frame{{ 's' if total_frames != 1 else '' }} sampled at {{ sampled_fps }} fps
+      </div>
+    </div>
+    <a class="btn-secondary" href="{{ url_for('index') }}">← Analyze Another Clip</a>
+  </div>
+
+  <div class="no-sites" style="margin-bottom:24px;">
+    Each site below was tracked across the sampled frames of the clip.
+    <b>Score</b> blends the same visual quality factors as photo analysis
+    (occlusion, sightline position, surface, size, shape) with a
+    <b>dwell score</b> — the fraction of sampled frames the surface stayed
+    visible/trackable for — so a surface that's clearly in view for most
+    of the drive-by ranks higher than one glimpsed for a single frame.
+  </div>
+
+  {% if sites|length == 0 %}
+    <div class="no-sites">
+      There is no proper place for billboard placement in this clip —
+      every candidate surface was either too small, occluded, too
+      briefly visible, or simply not billboard-suitable (fences, glass,
+      shutters, etc). Try a clip with slower, steadier footage of clear
+      building facades or walls.
+    </div>
+  {% else %}
+    <p class="section-label">Ranked Sites</p>
+
+    {% for s in sites %}
+    <div class="site-card">
+      <div class="site-banner tier-{{ s.recommendation|lower }}">
+        <span class="sid">{{ s.sid }} &nbsp; {{ s.recommendation }}{% if s.low_confidence %} &nbsp;<small>(single-frame, unconfirmed)</small>{% endif %}</span>
+        <span class="tier-label">{{ s.class_name }}</span>
+      </div>
+
+      <div class="frame-panel" style="margin:0;">
+        <img src="{{ url_for('serve_output', filename=s.thumb_filename) }}" alt="Best frame for {{ s.sid }}">
+      </div>
+
+      <div class="site-body">
+        <div>
+          <div class="score-line">
+            <span class="score-value mono">{{ "%.2f"|format(s.score) }}</span>
+            <span class="score-label">Site Score</span>
+          </div>
+          <p class="why-heading">Why recommended:</p>
+          <ul class="bullets">
+            {% for b in s.bullets %}
+            <li>{{ b }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="gauge-col">
+          <div class="gauge-row">
+            <div class="g-label"><span>Dwell (visibility)</span><span>{{ "%.2f"|format(s.dwell_score) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.dwell_score*100)|round|int }}%"></div></div>
+          </div>
+          <div class="gauge-row">
+            <div class="g-label"><span>Best-frame visual score</span><span>{{ "%.2f"|format(s.base_score) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.base_score*100)|round|int }}%"></div></div>
+          </div>
+          <div class="gauge-row">
+            <div class="g-label"><span>Frames seen</span><span>{{ s.n_frames_seen }} / {{ total_frames }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ ((s.n_frames_seen/total_frames)*100)|round|int }}%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if debug_frames %}
+    <p class="section-label" style="margin-top:36px;">Frame-by-Frame Breakdown</p>
+    <div class="no-sites" style="margin-bottom:16px;">
+      Every sampled frame, with everything that passed the reject gate on
+      that frame drawn and labeled (colour = the tier it would fall into
+      on its own: green PREMIUM, orange VIABLE, red AVOID). Use this to
+      audit the pipeline directly — e.g. confirm nothing is being drawn
+      on top of a vehicle passing through the shot.
+    </div>
+    <div class="frame-grid">
+      {% for df in debug_frames %}
+      <div class="frame-grid-item">
+        <img src="{{ url_for('serve_output', filename=df.filename) }}" alt="Frame {{ df.idx }}">
+        <div class="frame-grid-caption">t={{ df.ts }}s &middot; {{ df.n_candidates }} candidate{{ 's' if df.n_candidates != 1 else '' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+</div>
+
+</body>
+</html>

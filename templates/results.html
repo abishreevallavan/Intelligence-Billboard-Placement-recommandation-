@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Results — Billboard Recommendation</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="15" cy="15" r="13" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="1" x2="15" y2="7" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="23" x2="15" y2="29" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="1" y1="15" x2="7" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="23" y1="15" x2="29" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <circle cx="15" cy="15" r="3" fill="#C2740B"/>
+      </svg>
+    </span>
+    <span>Billboard Recommendation<small>OOH Site Survey</small></span>
+  </div>
+  <div class="tagline">image-based surface analysis</div>
+</div>
+
+<div class="shell">
+
+  <div class="results-head">
+    <div>
+      <h1>{{ sites|length }} site{{ 's' if sites|length != 1 else '' }} recommended</h1>
+      <div class="meta">
+        <span class="mode-chip">{{ 'Driver POV' if mode == 'driver' else 'Pedestrian POV' }}</span>
+        &nbsp;·&nbsp; {{ frame_w }}×{{ frame_h }} px &nbsp;·&nbsp; {{ num_rejected }} surfaces hard-rejected &nbsp;·&nbsp; {{ num_avoid }} below viable threshold
+      </div>
+    </div>
+    <a class="btn-secondary" href="{{ url_for('index') }}">← Analyze Another Photo</a>
+  </div>
+
+  <div class="frame-panel">
+    <span class="reticle tl">{% include 'partials/reticle_light.svg' %}</span>
+    <span class="reticle tr">{% include 'partials/reticle_light.svg' %}</span>
+    <span class="reticle bl">{% include 'partials/reticle_light.svg' %}</span>
+    <span class="reticle br">{% include 'partials/reticle_light.svg' %}</span>
+    <img src="{{ url_for('serve_output', filename=job_id + '_annotated.jpg') }}" alt="Annotated street photo with recommended sites boxed">
+  </div>
+
+  {% if sites|length == 0 %}
+    <div class="no-sites">
+      No suitable billboard surfaces were found in this image — every candidate
+      was either too small, occluded, occupied, or in the sky/road zone.
+      Try a photo with more building facades, walls, or fences clearly in view.
+    </div>
+  {% else %}
+    <p class="section-label">Ranked Sites</p>
+
+    {% for s in sites %}
+    <div class="site-card">
+      <div class="site-banner tier-{{ s.recommendation|lower }}">
+        <span class="sid">{{ s.sid }} &nbsp; {{ s.recommendation }}</span>
+        <span class="tier-label">{{ s.class_name }}</span>
+      </div>
+      <div class="site-body">
+        <div>
+          <div class="score-line">
+            <span class="score-value mono">{{ "%.2f"|format(s.score) }}</span>
+            <span class="score-label">Site Score</span>
+          </div>
+          <p class="why-heading">Why recommended:</p>
+          <ul class="bullets">
+            {% for b in s.bullets %}
+            <li>{{ b }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="gauge-col">
+          <div class="gauge-row">
+            <div class="g-label"><span>Occlusion</span><span>{{ "%.2f"|format(s.s_occ) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.s_occ*100)|round|int }}%"></div></div>
+          </div>
+          <div class="gauge-row">
+            <div class="g-label"><span>Sightline</span><span>{{ "%.2f"|format(s.s_pos) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.s_pos*100)|round|int }}%"></div></div>
+          </div>
+          <div class="gauge-row">
+            <div class="g-label"><span>Surface</span><span>{{ "%.2f"|format(s.s_surface) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.s_surface*100)|round|int }}%"></div></div>
+          </div>
+          <div class="gauge-row">
+            <div class="g-label"><span>Size</span><span>{{ "%.2f"|format(s.s_size) }}</span></div>
+            <div class="gauge-track"><div class="gauge-fill {{ 'premium' if s.recommendation=='PREMIUM' else 'viable' }}" style="width: {{ (s.s_size*100)|round|int }}%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="rejected-summary">
+    {{ num_rejected }} surface(s) hard-rejected (sky/ground zone, glass-heavy, occluded, occupied facade, or wrong shape) · {{ num_avoid }} passed the gate but scored below the viable threshold.
+  </div>
+
+  {% if debug and rejected %}
+  <p class="section-label" style="margin-top:28px;">Debug — Why Each Surface Was Rejected</p>
+  <div class="site-card" style="padding:16px 20px;">
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <tr style="text-align:left; opacity:0.6;">
+        <th style="padding:6px 8px;">class</th>
+        <th style="padding:6px 8px;">bbox (x,y,w,h)</th>
+        <th style="padding:6px 8px;">area %</th>
+        <th style="padding:6px 8px;">reason</th>
+      </tr>
+      {% for r in rejected %}
+      <tr style="border-top:1px solid rgba(0,0,0,0.08);">
+        <td style="padding:6px 8px;">{{ r.class_name }}{% if r.auto_detected %} (auto){% endif %}</td>
+        <td style="padding:6px 8px;" class="mono">{{ r.bbox }}</td>
+        <td style="padding:6px 8px;" class="mono">{{ r.area_pct }}</td>
+        <td style="padding:6px 8px;">{{ r.hard_reject }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billboard Recommendation — Site Recommender</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="15" cy="15" r="13" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="1" x2="15" y2="7" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="15" y1="23" x2="15" y2="29" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="1" y1="15" x2="7" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <line x1="23" y1="15" x2="29" y2="15" stroke="#1B2430" stroke-width="1.4"/>
+        <circle cx="15" cy="15" r="3" fill="#C2740B"/>
+      </svg>
+    </span>
+    <span>Billboard Recommendation<small>OOH Site Survey</small></span>
+  </div>
+  <div class="tagline">image-based surface analysis</div>
+</div>
+
+<div class="shell">
+  <div class="hero">
+    <h1>Find billboard-viable surfaces in a single street photo.</h1>
+    <p class="lede">
+      Upload one street-level photo and tell us how it was shot.
+      It segments the scene, filters out sky, occlusions, and occupied
+      facades, and ranks every wall, fence, or existing ad structure that
+      could hold a hoarding — with a score and the reasons behind it.
+    </p>
+
+    {% if error %}
+      <div class="error-banner">{{ error }}</div>
+    {% endif %}
+
+    <form id="upload-form" action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data">
+
+      <p class="mode-label">Photo taken from</p>
+      <div class="mode-toggle" id="mode-toggle" role="radiogroup" aria-label="Photo viewpoint">
+        <span class="mode-toggle-thumb" id="mode-toggle-thumb"></span>
+        <button type="button" class="mode-option active" data-mode="driver" role="radio" aria-checked="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 15L4.5 9.5C4.8 8.3 5.9 7.5 7.1 7.5H16.9C18.1 7.5 19.2 8.3 19.5 9.5L21 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="2.5" y="15" width="19" height="4.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="7" cy="19.5" r="1.4" fill="currentColor"/>
+            <circle cx="17" cy="19.5" r="1.4" fill="currentColor"/>
+          </svg>
+          Driver POV
+        </button>
+        <button type="button" class="mode-option" data-mode="pedestrian" role="radio" aria-checked="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12 8V14M12 14L8.5 21M12 14L15.5 21M9 10.5L12 12L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Pedestrian POV
+        </button>
+      </div>
+      <input type="hidden" name="mode" id="mode-input" value="driver">
+      <p class="mode-hint" id="mode-hint">Photo taken from inside a moving vehicle, at windscreen height.</p>
+
+      <div class="mode-toggle" id="asset-toggle" role="radiogroup" aria-label="Photo or video" style="margin-top:10px;">
+        <span class="mode-toggle-thumb" id="asset-toggle-thumb"></span>
+        <button type="button" class="mode-option active" data-asset="photo" role="radio" aria-checked="true">Photo</button>
+        <button type="button" class="mode-option" data-asset="video" role="radio" aria-checked="false">Video (up to 20s)</button>
+      </div>
+      <p class="mode-hint" id="asset-hint">Video mode samples 1 frame/sec and factors in how many frames each surface stays visible for (dwell score) — driver POV only.</p>
+
+      <div class="dropzone" id="dropzone">
+        <span class="reticle tl">{% include 'partials/reticle.svg' %}</span>
+        <span class="reticle tr">{% include 'partials/reticle.svg' %}</span>
+        <span class="reticle bl">{% include 'partials/reticle.svg' %}</span>
+        <span class="reticle br">{% include 'partials/reticle.svg' %}</span>
+
+        <div class="dropzone-icon">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="5" width="18" height="14" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="8.5" cy="10" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M3 16L8 12L12 15L16 10L21 15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3 id="dropzone-title">Drop a street-level photo here</h3>
+        <p id="dropzone-hint">JPG, PNG, or WEBP · up to 25MB</p>
+
+        <label class="file-input-label" for="image-input" id="file-input-label">Choose Photo</label>
+        <input type="file" name="image" id="image-input" accept=".jpg,.jpeg,.png,.webp,.bmp" required>
+
+        <div id="filename-display"></div>
+        <div class="preview-wrap" id="preview-wrap">
+          <img id="preview-img" src="" alt="Selected preview">
+        </div>
+      </div>
+
+      <div class="submit-row">
+        <button type="submit" class="btn-analyze" id="analyze-btn" disabled>Analyze Surface</button>
+        <span class="hint">First run downloads the segmentation model — this can take a minute.</span>
+      </div>
+    </form>
+
+    <div class="loading-panel" id="loading-panel">
+      <div class="scanner">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="56" height="56" rx="3" stroke="#DDD8CC" stroke-width="1.4"/>
+          <line class="scan-line" x1="8" y1="32" x2="56" y2="32" stroke="#C2740B" stroke-width="2"/>
+        </svg>
+      </div>
+      <p id="loading-text">Segmenting scene…</p>
+    </div>
+
+    <div class="legend-strip">
+      <div class="legend-item"><span class="legend-dot premium"></span> Premium — high-confidence billboard site</div>
+      <div class="legend-item"><span class="legend-dot viable"></span> Viable — usable with minor tradeoffs</div>
+      <div class="legend-item"><span class="legend-dot avoid"></span> Avoid — occluded, occupied, or too small</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const dropzone   = document.getElementById('dropzone');
+const input      = document.getElementById('image-input');
+const fnDisplay  = document.getElementById('filename-display');
+const previewWrap= document.getElementById('preview-wrap');
+const previewImg = document.getElementById('preview-img');
+const analyzeBtn = document.getElementById('analyze-btn');
+const form       = document.getElementById('upload-form');
+const loadingPanel = document.getElementById('loading-panel');
+const loadingText  = document.getElementById('loading-text');
+const dzTitle    = document.getElementById('dropzone-title');
+const dzHint     = document.getElementById('dropzone-hint');
+const fileLabel  = document.getElementById('file-input-label');
+
+function handleFiles(files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  input.files = files;
+  fnDisplay.textContent = file.name + '  (' + Math.round(file.size/1024) + ' KB)';
+  if (file.type && file.type.startsWith('video/')) {
+    previewWrap.style.display = 'none';
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewWrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+  analyzeBtn.disabled = false;
+}
+
+input.addEventListener('change', () => handleFiles(input.files));
+
+['dragenter','dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropzone.classList.add('dragover');
+  });
+});
+['dragleave','drop'].forEach(evt => {
+  dropzone.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation();
+    dropzone.classList.remove('dragover');
+  });
+});
+dropzone.addEventListener('drop', e => {
+  const dt = e.dataTransfer;
+  if (dt && dt.files && dt.files.length) handleFiles(dt.files);
+});
+
+const loadingMessages = [
+  "Segmenting scene…",
+  "Locating candidate surfaces…",
+  "Checking occlusion & sightlines…",
+  "Scoring blank/flat surface quality…",
+  "Ranking sites…"
+];
+form.addEventListener('submit', () => {
+  if (!input.files || !input.files.length) return;
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = "Analyzing…";
+  loadingPanel.style.display = 'block';
+  let i = 0;
+  setInterval(() => {
+    i = (i + 1) % loadingMessages.length;
+    loadingText.textContent = loadingMessages[i];
+  }, 2200);
+});
+
+/* ── Toggle thumb positioning ─────────────────────────────────────────
+   The thumb used to be a CSS 50/50 split (width: calc(50% - 4px), plus
+   a translateX(100%) for the second option). That only lines up when
+   both options are roughly the same width — it breaks the moment one
+   label is much longer than the other (e.g. "Photo" vs "Video (up to
+   20s)"), leaving the pill either too narrow/wide or misaligned behind
+   the text. Instead, measure the actual active button and size/position
+   the thumb to match it exactly, for any label length. */
+function positionThumb(toggleEl) {
+  const thumb  = toggleEl.querySelector('.mode-toggle-thumb');
+  const active = toggleEl.querySelector('.mode-option.active');
+  if (!thumb || !active) return;
+  if (toggleEl.offsetParent === null) return; // toggle currently hidden (display:none) — nothing to measure
+  thumb.style.width = active.offsetWidth + 'px';
+  thumb.style.left  = active.offsetLeft + 'px';
+}
+
+/* ── Mode toggle (Driver POV / Pedestrian POV) ───────────────────────── */
+const modeToggle  = document.getElementById('mode-toggle');
+const modeOptions = modeToggle.querySelectorAll('.mode-option');
+const modeInput   = document.getElementById('mode-input');
+const modeHint    = document.getElementById('mode-hint');
+
+const MODE_HINTS = {
+  driver: "Photo taken from inside a moving vehicle, at windscreen height.",
+  pedestrian: "Photo taken standing on a sidewalk or footpath, at eye level."
+};
+
+function setMode(mode) {
+  modeInput.value = mode;
+  modeToggle.dataset.mode = mode;
+  modeOptions.forEach(btn => {
+    const isActive = btn.dataset.mode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+  modeHint.textContent = MODE_HINTS[mode] || "";
+  positionThumb(modeToggle);
+}
+
+modeOptions.forEach(btn => {
+  btn.addEventListener('click', () => {
+    setMode(btn.dataset.mode);
+    if (btn.dataset.mode !== 'driver') setAsset('photo');
+    assetToggle.style.display = (btn.dataset.mode === 'driver') ? 'flex' : 'none';
+    assetHint.style.display = (btn.dataset.mode === 'driver') ? 'block' : 'none';
+    if (btn.dataset.mode === 'driver') positionThumb(assetToggle);
+  });
+});
+
+/* ── Asset toggle (Photo / Video) — Driver POV only ──────────────────── */
+const assetToggle = document.getElementById('asset-toggle');
+const assetOptions = assetToggle.querySelectorAll('.mode-option');
+const assetHint = document.getElementById('asset-hint');
+
+function setAsset(asset) {
+  assetToggle.dataset.asset = asset;
+  assetOptions.forEach(btn => {
+    const isActive = btn.dataset.asset === asset;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+  positionThumb(assetToggle);
+  fnDisplay.textContent = '';
+  previewWrap.style.display = 'none';
+  input.value = '';
+  analyzeBtn.disabled = true;
+
+  if (asset === 'video') {
+    input.setAttribute('accept', '.mp4,.mov,.avi,.webm,.mkv');
+    dzTitle.textContent = 'Drop a short driver-POV video here';
+    dzHint.textContent = 'MP4, MOV, or WEBM · up to ~20 seconds · up to 200MB';
+    fileLabel.textContent = 'Choose Video';
+  } else {
+    input.setAttribute('accept', '.jpg,.jpeg,.png,.webp,.bmp');
+    dzTitle.textContent = 'Drop a street-level photo here';
+    dzHint.textContent = 'JPG, PNG, or WEBP · up to 25MB';
+    fileLabel.textContent = 'Choose Photo';
+  }
+}
+
+assetOptions.forEach(btn => {
+  btn.addEventListener('click', () => setAsset(btn.dataset.asset));
+});
+
+setMode('driver');
+setAsset('photo');
+
+// Label widths can shift slightly once the webfonts finish loading, and
+// wrap differently at other viewport widths — re-measure in both cases
+// so the thumb never drifts out from behind its label.
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => {
+    positionThumb(modeToggle);
+    positionThumb(assetToggle);
+  });
+}
+window.addEventListener('resize', () => {
+  positionThumb(modeToggle);
+  positionThumb(assetToggle);
+});
+</script>
+
+</body>
+</html>
