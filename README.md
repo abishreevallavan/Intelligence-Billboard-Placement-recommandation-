@@ -74,8 +74,6 @@ python app.py
 ## Usage
 
 1. Start the Flask server.
-      1. **step 1 **: pip install -r requirements.txt
-      2. ** step 2** : python app.py 
 3. Open `http://127.0.0.1:5000`.
 4. Choose Driver or Pedestrian mode.
 5. Upload an image or video.
