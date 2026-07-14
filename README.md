@@ -3,7 +3,7 @@
 
 An AI-powered Surface Analysis for billboard placement recommendation system that analyzes street-view images and identifies optimal advertising locations using semantic segmentation and computer vision.
 
-The system evaluates candidate billboard surfaces based on visibility, surface quality, occlusion, size, position, and temporal consistency, helping advertisers identify high-impact billboard locations.
+The system evaluates candidate billboard surfaces based on visibility, surface quality, occlusion, size, position, and temporal consistency, helping advertisers identify high-impact billboard locations
 
 ---
 
